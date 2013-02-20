@@ -107,10 +107,13 @@ public class ControlPanelPicker extends AlertActivity implements OnClickListener
             // set new default
             Intent updateIntent = new Intent(this, Service.class);
             Cursor c = mAlertParams.mCursor;
-            c.moveToPosition(mAlertParams.mCheckedItem);
-            updateIntent.putExtra("defPackage", c.getString(2));
-            updateIntent.putExtra("defName", c.getString(3));
-            startService(updateIntent);
+
+            if (mAlertParams.mCheckedItem >= 0) {
+                c.moveToPosition(mAlertParams.mCheckedItem);
+                updateIntent.putExtra("defPackage", c.getString(2));
+                updateIntent.putExtra("defName", c.getString(3));
+                startService(updateIntent);
+            }
         }
     }
 
