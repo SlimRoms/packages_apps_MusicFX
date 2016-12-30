@@ -36,6 +36,7 @@ import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.drawable.ColorDrawable;
 import android.media.AudioFormat;
 import android.media.AudioManager;
@@ -149,16 +150,6 @@ public class ActivityMusic extends Activity {
     private Context mContext;
 
     /**
-     * Calling package name field
-     */
-    private String mCallingPackageName = "empty";
-
-    /**
-     * Audio session field
-     */
-    private int mAudioSession = AudioEffect.ERROR_BAD_VALUE;
-
-    /**
      * AudioPortUpdateListener to handle UI update on device change
      */
     private MyOnAudioPortUpdateListener mAudioPortUpdateListener = null;
@@ -183,18 +174,18 @@ public class ActivityMusic extends Activity {
                 device == AudioManager.DEVICE_OUT_WIRED_HEADPHONE ||
                 device == AudioManager.DEVICE_OUT_WIRED_HEADSET) {
                 mIsHeadsetOn = true;
-             } else if (device == AudioManager.DEVICE_OUT_SPEAKER) {
+            } else if (device == AudioManager.DEVICE_OUT_SPEAKER) {
                 mIsSpeakerOn = true;
-             } else if (device == (AudioManager.DEVICE_OUT_SPEAKER |
+            } else if (device == (AudioManager.DEVICE_OUT_SPEAKER |
                                    AudioManager.DEVICE_OUT_WIRED_HEADPHONE)) {
-               mIsComboDevice = true;
-             }
+                mIsComboDevice = true;
+            }
 
-             Log.v(TAG, "onAudioPortListUpdate: device=" + device);
-             if (isHeadsetOnPrev != mIsHeadsetOn ||
-                 isSpeakerOnPrev != mIsSpeakerOn) {
-                 updateUIHeadset(false);
-             }
+            Log.d(TAG, "onAudioPortListUpdate: device=" + device);
+            if (isHeadsetOnPrev != mIsHeadsetOn || isSpeakerOnPrev != mIsSpeakerOn) {
+                Log.d(TAG, "updateUIHeadset: mIsHeadsetOn: " + mIsHeadsetOn + " mIsSpeakerOn: " + mIsSpeakerOn);
+                updateUIHeadset(false);
+            }
         }
 
         /**
@@ -229,35 +220,15 @@ public class ActivityMusic extends Activity {
         // Init context to be used in listeners
         mContext = this;
 
-        // Receive intent
-        // get calling intent
-        final Intent intent = getIntent();
-        mAudioSession = intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,
-                AudioEffect.ERROR_BAD_VALUE);
-        Log.v(TAG, "audio session: " + mAudioSession);
-
-        mCallingPackageName = getCallingPackage();
-
-        // check for errors
-        if (mCallingPackageName == null) {
-            Log.e(TAG, "Package name is null");
-            setResult(RESULT_CANCELED);
-            finish();
-            return;
-        }
-        setResult(RESULT_OK);
-
-        Log.v(TAG, mCallingPackageName + " (" + mAudioSession + ")");
-
-        ControlPanelEffect.initEffectsPreferences(mContext, mCallingPackageName, mAudioSession);
+        ControlPanelEffect.initEffectsPreferences(mContext);
 
         // query available effects
         final Descriptor[] effects = AudioEffect.queryEffects();
 
         // Determine available/supported effects
-        Log.v(TAG, "Available effects:");
+        Log.d(TAG, "Available effects:");
         for (final Descriptor effect : effects) {
-            Log.v(TAG, effect.name.toString() + ", type: " + effect.type.toString());
+            Log.d(TAG, effect.name.toString() + ", type: " + effect.type.toString());
 
             if (effect.type.equals(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
                 mVirtualizerSupported = true;
@@ -271,23 +242,21 @@ public class ActivityMusic extends Activity {
             }
         }
 
-        getWindow().requestFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
         setContentView(R.layout.music_main);
         final ViewGroup viewGroup = (ViewGroup) findViewById(R.id.contentSoundEffects);
 
         // Fill array with presets from AudioEffects call.
-        // allocate a space for 2 extra strings (CI Extreme & User)
-        final int numPresets = ControlPanelEffect.getParameterInt(mContext, mCallingPackageName,
-                mAudioSession, ControlPanelEffect.Key.eq_num_presets);
-        mEQPresetNames = new String[numPresets + 2];
+        // allocate a space for 1 extra strings (User)
+        final int numPresets = ControlPanelEffect.getParameterInt(mContext,
+                ControlPanelEffect.Key.eq_num_presets);
+        mEQPresetNames = new String[numPresets + 1];
         for (short i = 0; i < numPresets; i++) {
             final String eqPresetName = ControlPanelEffect.getParameterString(mContext,
-                    mCallingPackageName, mAudioSession, ControlPanelEffect.Key.eq_preset_name, i);
+                    ControlPanelEffect.Key.eq_preset_name, i);
             mEQPresetNames[i] = localizePresetName(eqPresetName);
         }
-        mEQPresetNames[numPresets] = getString(R.string.ci_extreme);
-        mEQPresetNames[numPresets + 1] = getString(R.string.user);
-        mEQPresetUserPos = numPresets + 1;
+        mEQPresetNames[numPresets] = getString(R.string.user);
+        mEQPresetUserPos = numPresets;
 
         // Load string resource of reverb presets
         mReverbPresetNames = new String[mReverbPresetRSids.length];
@@ -309,8 +278,7 @@ public class ActivityMusic extends Activity {
                         final boolean isChecked) {
                     toggleSwithText.setText(isChecked? R.string.toggle_button_on : R.string.toggle_button_off);
                     // set parameter and state
-                    ControlPanelEffect.setParameterBoolean(mContext, mCallingPackageName,
-                            mAudioSession, ControlPanelEffect.Key.global_enabled, isChecked);
+                    ControlPanelEffect.setEnabled(mContext, isChecked);
                     // Enable Linear layout (in scroll layout) view with all
                     // effect contents depending on checked state
                     setEnabledAllChildren(viewGroup, isChecked);
@@ -336,13 +304,13 @@ public class ActivityMusic extends Activity {
                     public void onValueChanged(final Knob knob, final int value,
                         final boolean fromUser) {
                         // set parameter and state
-                        ControlPanelEffect.setParameterInt(mContext, mCallingPackageName,
-                                mAudioSession, ControlPanelEffect.Key.virt_strength, value);
+                        ControlPanelEffect.setParameterInt(mContext,
+                                ControlPanelEffect.Key.virt_strength, value);
                     }
 
                     @Override
                     public boolean onSwitchChanged(final Knob knob, boolean on) {
-                        if (on && !mIsHeadsetOn) {
+                        if (on && (!mIsHeadsetOn && mVirtualizerIsHeadphoneOnly)) {
                             if (mIsComboDevice) {
                                 showHeadsetMsg(getString(R.string.combo_device));
                             } else {
@@ -350,8 +318,8 @@ public class ActivityMusic extends Activity {
                             }
                             return false;
                         }
-                        ControlPanelEffect.setParameterBoolean(mContext, mCallingPackageName,
-                                mAudioSession, ControlPanelEffect.Key.virt_enabled, on);
+                        ControlPanelEffect.setParameterBoolean(mContext,
+                                ControlPanelEffect.Key.virt_enabled, on);
                         return true;
                     }
                 });
@@ -371,8 +339,8 @@ public class ActivityMusic extends Activity {
                     public void onValueChanged(final Knob knob, final int value,
                             final boolean fromUser) {
                         // set parameter and state
-                        ControlPanelEffect.setParameterInt(mContext, mCallingPackageName,
-                                mAudioSession, ControlPanelEffect.Key.bb_strength, value);
+                        ControlPanelEffect.setParameterInt(mContext,
+                                ControlPanelEffect.Key.bb_strength, value);
                     }
 
                     @Override
@@ -385,8 +353,8 @@ public class ActivityMusic extends Activity {
                             }
                             return false;
                         }
-                        ControlPanelEffect.setParameterBoolean(mContext, mCallingPackageName,
-                                mAudioSession, ControlPanelEffect.Key.bb_enabled, on);
+                        ControlPanelEffect.setParameterBoolean(mContext,
+                                ControlPanelEffect.Key.bb_enabled, on);
                         return true;
                     }
                 });
@@ -394,8 +362,8 @@ public class ActivityMusic extends Activity {
 
             // Initialize the Equalizer elements.
             if (mEqualizerSupported) {
-                mEQPreset = ControlPanelEffect.getParameterInt(mContext, mCallingPackageName,
-                        mAudioSession, ControlPanelEffect.Key.eq_current_preset);
+                mEQPreset = ControlPanelEffect.getParameterInt(mContext,
+                        ControlPanelEffect.Key.eq_current_preset);
                 if (mEQPreset >= mEQPresetNames.length) {
                     mEQPreset = 0;
                 }
@@ -406,8 +374,8 @@ public class ActivityMusic extends Activity {
             // Initialize the Preset Reverb elements.
             // Set Spinner listeners.
             if (mPresetReverbSupported) {
-                mPRPreset = ControlPanelEffect.getParameterInt(mContext, mCallingPackageName,
-                        mAudioSession, ControlPanelEffect.Key.pr_current_preset);
+                mPRPreset = ControlPanelEffect.getParameterInt(mContext,
+                        ControlPanelEffect.Key.pr_current_preset);
                 mPRPresetPrevious = mPRPreset;
                 reverbSpinnerInit((Spinner)findViewById(R.id.prSpinner));
             }
@@ -552,12 +520,12 @@ public class ActivityMusic extends Activity {
             }
 
             if (enabled && view == virt) {
-                on = ControlPanelEffect.getParameterBoolean(mContext, mCallingPackageName,
-                        mAudioSession, ControlPanelEffect.Key.virt_enabled);
+                on = ControlPanelEffect.getParameterBoolean(mContext,
+                        ControlPanelEffect.Key.virt_enabled);
                 view.setEnabled(on);
             } else if (enabled && view == bb) {
-                on = ControlPanelEffect.getParameterBoolean(mContext, mCallingPackageName,
-                        mAudioSession, ControlPanelEffect.Key.bb_enabled);
+                on = ControlPanelEffect.getParameterBoolean(mContext,
+                        ControlPanelEffect.Key.bb_enabled);
                 view.setEnabled(on);
             } else if (enabled && view == eq) {
                 showSeekBar(mEQPreset == mEQPresetUserPos);
@@ -573,7 +541,7 @@ public class ActivityMusic extends Activity {
      */
     private void updateUI() {
         final boolean isEnabled = ControlPanelEffect.getParameterBoolean(mContext,
-                mCallingPackageName, mAudioSession, ControlPanelEffect.Key.global_enabled);
+                ControlPanelEffect.Key.global_enabled);
         mToggleSwitch.setChecked(isEnabled);
         toggleSwithText.setText(isEnabled? R.string.toggle_button_on : R.string.toggle_button_off);
         setEnabledAllChildren((ViewGroup) findViewById(R.id.contentSoundEffects), isEnabled);
@@ -582,11 +550,10 @@ public class ActivityMusic extends Activity {
         if (mVirtualizerSupported) {
             Knob knob = (Knob) findViewById(R.id.vIStrengthKnob);
             int strength = ControlPanelEffect
-                    .getParameterInt(mContext, mCallingPackageName, mAudioSession,
+                    .getParameterInt(mContext,
                             ControlPanelEffect.Key.virt_strength);
             knob.setValue(strength);
             boolean hasStrength = ControlPanelEffect.getParameterBoolean(mContext,
-                    mCallingPackageName, mAudioSession,
                     ControlPanelEffect.Key.virt_strength_supported);
             if (!hasStrength) {
                 knob.setVisibility(View.GONE);
@@ -594,7 +561,7 @@ public class ActivityMusic extends Activity {
         }
         if (mBassBoostSupported) {
             ((Knob) findViewById(R.id.bBStrengthKnob)).setValue(ControlPanelEffect
-                    .getParameterInt(mContext, mCallingPackageName, mAudioSession,
+                    .getParameterInt(mContext,
                             ControlPanelEffect.Key.bb_strength));
         }
         if (mEqualizerSupported) {
@@ -602,7 +569,7 @@ public class ActivityMusic extends Activity {
         }
         if (mPresetReverbSupported) {
             int reverb = ControlPanelEffect.getParameterInt(
-                                    mContext, mCallingPackageName, mAudioSession,
+                                    mContext,
                                     ControlPanelEffect.Key.pr_current_preset);
             ((Spinner)findViewById(R.id.prSpinner)).setSelection(reverb);
         }
@@ -637,22 +604,18 @@ public class ActivityMusic extends Activity {
     private void updateUIHeadset(boolean force) {
         boolean enabled = mToggleSwitch.isChecked() && mIsHeadsetOn;
         final Knob bBKnob = (Knob) findViewById(R.id.bBStrengthKnob);
-        bBKnob.setBinary(mIsSpeakerOn);
+        //bBKnob.setBinary(mIsSpeakerOn);
         bBKnob.setEnabled(mToggleSwitch.isChecked()
                 && (mIsHeadsetOn || mIsSpeakerOn));
         final Knob vIKnob = (Knob) findViewById(R.id.vIStrengthKnob);
         vIKnob.setEnabled(enabled || !mVirtualizerIsHeadphoneOnly);
 
-        Log.v(TAG, "updateUIHeadset: mIsHeadsetOn: " + mIsHeadsetOn);
-        Log.v(TAG, "updateUIHeadset: mIsSpeakerOn: " + mIsSpeakerOn);
         if (!force) {
             boolean on = ControlPanelEffect.getParameterBoolean(mContext,
-                    mCallingPackageName, mAudioSession,
                     ControlPanelEffect.Key.bb_enabled);
             bBKnob.setOn(mToggleSwitch.isChecked()
                     && (mIsHeadsetOn || mIsSpeakerOn) && on);
             on = ControlPanelEffect.getParameterBoolean(mContext,
-                    mCallingPackageName, mAudioSession,
                     ControlPanelEffect.Key.virt_enabled);
             vIKnob.setOn((enabled && on) || !mVirtualizerIsHeadphoneOnly);
         }
@@ -663,15 +626,14 @@ public class ActivityMusic extends Activity {
      */
     private void equalizerBandsInit(LinearLayout eqcontainer) {
         // Initialize the N-Band Equalizer elements.
-        mNumberEqualizerBands = ControlPanelEffect.getParameterInt(mContext, mCallingPackageName,
-                mAudioSession, ControlPanelEffect.Key.eq_num_bands);
+        mNumberEqualizerBands = ControlPanelEffect.getParameterInt(mContext,
+                ControlPanelEffect.Key.eq_num_bands);
         mEQPresetUserBandLevelsPrev = ControlPanelEffect.getParameterIntArray(mContext,
-                mCallingPackageName, mAudioSession,
                 ControlPanelEffect.Key.eq_preset_user_band_level);
         final int[] centerFreqs = ControlPanelEffect.getParameterIntArray(mContext,
-                mCallingPackageName, mAudioSession, ControlPanelEffect.Key.eq_center_freq);
+                ControlPanelEffect.Key.eq_center_freq);
         final int[] bandLevelRange = ControlPanelEffect.getParameterIntArray(mContext,
-                mCallingPackageName, mAudioSession, ControlPanelEffect.Key.eq_level_range);
+                ControlPanelEffect.Key.eq_level_range);
         mEqualizerMinBandLevel = (int) Math.min(EQUALIZER_MIN_LEVEL, bandLevelRange[0]);
         final int mEqualizerMaxBandLevel = (int) Math.max(EQUALIZER_MAX_LEVEL, bandLevelRange[1]);
         final OnSeekBarChangeListener listener = new OnSeekBarChangeListener() {
@@ -770,7 +732,7 @@ public class ActivityMusic extends Activity {
     private void equalizerUpdateDisplay() {
         // Update and show the active N-Band Equalizer bands.
         final int[] bandLevels = ControlPanelEffect.getParameterIntArray(mContext,
-                mCallingPackageName, mAudioSession, ControlPanelEffect.Key.eq_band_level);
+                ControlPanelEffect.Key.eq_band_level);
         for (short band = 0; band < mNumberEqualizerBands; band++) {
             final int level = bandLevels[band];
             final int progress = level - mEqualizerMinBandLevel;
@@ -787,7 +749,7 @@ public class ActivityMusic extends Activity {
      *            EQ band level
      */
     private void equalizerBandUpdate(final int band, final int level) {
-        ControlPanelEffect.setParameterInt(mContext, mCallingPackageName, mAudioSession,
+        ControlPanelEffect.setParameterInt(mContext,
                 ControlPanelEffect.Key.eq_band_level, level, band);
     }
 
@@ -798,7 +760,7 @@ public class ActivityMusic extends Activity {
      *            EQ preset id.
      */
     private void equalizerSetPreset(final int preset) {
-        ControlPanelEffect.setParameterInt(mContext, mCallingPackageName, mAudioSession,
+        ControlPanelEffect.setParameterInt(mContext,
                 ControlPanelEffect.Key.eq_current_preset, preset);
         equalizerUpdateDisplay();
     }
@@ -810,7 +772,7 @@ public class ActivityMusic extends Activity {
      *            PR preset id.
      */
     private void presetReverbSetPreset(final int preset) {
-        ControlPanelEffect.setParameterInt(mContext, mCallingPackageName, mAudioSession,
+        ControlPanelEffect.setParameterInt(mContext,
                 ControlPanelEffect.Key.pr_current_preset, preset);
     }
 
