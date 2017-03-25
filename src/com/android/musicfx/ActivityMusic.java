@@ -139,6 +139,7 @@ public class ActivityMusic extends AppCompatActivity {
     private Spinner mPRPresetSpinner;
 
     private boolean mPRPresetSpinnerInit;
+    private ArrayAdapter<String> mPRPresetAdapter;
 
     private boolean mIsHeadsetOn = false;
     private boolean mIsSpeakerOn = false;
@@ -521,11 +522,11 @@ public class ActivityMusic extends AppCompatActivity {
     }
 
     private void reverbSpinnerInit() {
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.spinner_item, mReverbPresetNames) {
+        mPRPresetAdapter = new ArrayAdapter<String>(this, R.layout.spinner_item, mReverbPresetNames) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
                 View item = super.getView(position, convertView, parent);
-                if (position == mPRPreset && position != 0) {
+                if (position == mPRPreset && position != 0 && mPRPresetSpinner.isEnabled()) {
                     ((TextView) item.findViewById(android.R.id.text1)).setTextColor(mHighlightColor);
                 } else {
                     ((TextView) item.findViewById(android.R.id.text1)).setTextColor(Color.BLACK);
@@ -533,7 +534,7 @@ public class ActivityMusic extends AppCompatActivity {
                 return item;
             }
         };
-        mPRPresetSpinner.setAdapter(adapter);
+        mPRPresetSpinner.setAdapter(mPRPresetAdapter);
         mPRPresetSpinner.setOnItemSelectedListener(new OnItemSelectedListener() {
 
             @Override
@@ -547,7 +548,7 @@ public class ActivityMusic extends AppCompatActivity {
                     presetReverbSetPreset(position);
                     TextView tv = (TextView) parent.getChildAt(0);
                     if (tv != null) {
-                        if (position != 0) {
+                        if (position != 0 && mPRPresetSpinner.isEnabled()) {
                             tv.setTextColor(mHighlightColor);
                         } else {
                             tv.setTextColor(Color.BLACK);
@@ -622,6 +623,9 @@ public class ActivityMusic extends AppCompatActivity {
             } else {
                 view.setEnabled(enabled);
             }
+        }
+        if (mPRPresetAdapter != null) {
+            mPRPresetAdapter.notifyDataSetChanged();
         }
     }
 
