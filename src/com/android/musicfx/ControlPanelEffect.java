@@ -98,35 +98,18 @@ public class ControlPanelEffect {
             mVirtualizer.release();
             mPresetReverb.release();
         }
-
-        protected void apply(Equalizer e) {
-            mEqualizer.setProperties(e.getProperties());
-        }
-
-        protected void apply(PresetReverb p) {
-            mPresetReverb.setProperties(p.getProperties());
-        }
-
-        protected void setEnabled(boolean value) {
-            mEqualizer.setEnabled(value);
-            mBassBoost.setEnabled(value);
-            mVirtualizer.setEnabled(value);
-            mPresetReverb.setEnabled(value);
-        }
     }
 
     protected static final Map<Integer, EffectSet> mAudioSessions = new HashMap<Integer, EffectSet>();
 
     // Defaults
-    final static boolean GLOBAL_ENABLED_DEFAULT = false;
-    private final static boolean VIRTUALIZER_ENABLED_DEFAULT = true;
+    private final static boolean GLOBAL_ENABLED_DEFAULT = false;
+    private final static boolean VIRTUALIZER_ENABLED_DEFAULT = false;
     private final static int VIRTUALIZER_STRENGTH_DEFAULT = 0;
-    private final static boolean BASS_BOOST_ENABLED_DEFAULT = true;
+    private final static boolean BASS_BOOST_ENABLED_DEFAULT = false;
     private final static int BASS_BOOST_STRENGTH_DEFAULT = 667;
-    private final static boolean PRESET_REVERB_ENABLED_DEFAULT = true;
+    private final static boolean PRESET_REVERB_ENABLED_DEFAULT = false;
     private final static int PRESET_REVERB_CURRENT_PRESET_DEFAULT = 0; // None
-    private static int mPrevBassBoostStrength = 0;
-    private static int mPrevVirtStrength = 0;
 
     // EQ defaults
     private final static boolean EQUALIZER_ENABLED_DEFAULT = true;
